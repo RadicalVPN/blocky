@@ -1,7 +1,7 @@
 .PHONY: all clean generate build test e2e-test lint run fmt docker-build help
 .DEFAULT_GOAL:=help
 
-VERSION?=$(shell git describe --always --tags)
+VERSION?="$(shell git describe --always --tags)-radical"
 BUILD_TIME?=$(shell date --iso-8601=seconds)
 DOC_PATH?="main"
 DOCKER_IMAGE_NAME=spx01/blocky

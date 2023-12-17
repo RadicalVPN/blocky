@@ -19,10 +19,11 @@ type MetricsResolver struct {
 	NextResolver
 	typed
 
-	totalQueries      *prometheus.CounterVec
-	totalResponse     *prometheus.CounterVec
-	totalErrors       prometheus.Counter
-	durationHistogram *prometheus.HistogramVec
+	totalQueries        *prometheus.CounterVec
+	totalQueriesBlocked *prometheus.CounterVec
+	totalResponse       *prometheus.CounterVec
+	totalErrors         prometheus.Counter
+	durationHistogram   *prometheus.HistogramVec
 }
 
 // Resolve resolves the passed request
@@ -44,13 +45,20 @@ func (r *MetricsResolver) Resolve(ctx context.Context, request *model.Request) (
 
 		r.durationHistogram.WithLabelValues(responseType).Observe(reqDurationMs)
 
+		if response.RType == model.ResponseTypeBLOCKED {
+			r.totalQueriesBlocked.With(prometheus.Labels{
+				"client": strings.Join(request.ClientNames, ","),
+				"type":   dns.TypeToString[request.Req.Question[0].Qtype],
+			}).Inc()
+		}
+
 		if err != nil {
 			r.totalErrors.Inc()
 		} else {
 			r.totalResponse.With(prometheus.Labels{
 				"reason":        response.Reason,
 				"response_code": dns.RcodeToString[response.Res.Rcode],
-				"response_type": response.RType.String(),
+				"response_type": responseType,
 			}).Inc()
 		}
 	}
@@ -78,6 +86,7 @@ func NewMetricsResolver(cfg config.MetricsConfig) *MetricsResolver {
 func (r *MetricsResolver) registerMetrics() {
 	metrics.RegisterMetric(r.durationHistogram)
 	metrics.RegisterMetric(r.totalQueries)
+	metrics.RegisterMetric(r.totalQueriesBlocked)
 	metrics.RegisterMetric(r.totalResponse)
 	metrics.RegisterMetric(r.totalErrors)
 }
@@ -87,6 +96,15 @@ func totalQueriesMetric() *prometheus.CounterVec {
 		prometheus.CounterOpts{
 			Name: "blocky_query_total",
 			Help: "Number of total queries",
+		}, []string{"client", "type"},
+	)
+}
+
+func totalQueriesBlockedMetric() *prometheus.CounterVec {
+	return prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "blocky_query_blocked_total",
+			Help: "Number of total queries blocked",
 		}, []string{"client", "type"},
 	)
 }
