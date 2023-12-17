@@ -72,10 +72,11 @@ func NewMetricsResolver(cfg config.MetricsConfig) *MetricsResolver {
 		configurable: withConfig(&cfg),
 		typed:        withType("metrics"),
 
-		durationHistogram: durationHistogram(),
-		totalQueries:      totalQueriesMetric(),
-		totalResponse:     totalResponseMetric(),
-		totalErrors:       totalErrorMetric(),
+		durationHistogram:   durationHistogram(),
+		totalQueries:        totalQueriesMetric(),
+		totalQueriesBlocked: totalQueriesBlockedMetric(),
+		totalResponse:       totalResponseMetric(),
+		totalErrors:         totalErrorMetric(),
 	}
 
 	m.registerMetrics()
