@@ -45,7 +45,7 @@ func (r *MetricsResolver) Resolve(ctx context.Context, request *model.Request) (
 
 		r.durationHistogram.WithLabelValues(responseType).Observe(reqDurationMs)
 
-		if response.RType == model.ResponseTypeBLOCKED {
+		if response != nil && response.RType == model.ResponseTypeBLOCKED {
 			r.totalQueriesBlocked.With(prometheus.Labels{
 				"client": strings.Join(request.ClientNames, ","),
 				"type":   dns.TypeToString[request.Req.Question[0].Qtype],
