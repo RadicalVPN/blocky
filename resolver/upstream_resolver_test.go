@@ -3,6 +3,7 @@ package resolver
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"net/http"
 	"sync/atomic"
@@ -109,6 +110,20 @@ var _ = Describe("UpstreamResolver", Label("upstreamResolver"), func() {
 				Expect(err).Should(HaveOccurred())
 			})
 		})
+		When("Configured DNS resolver returns ServFail", func() {
+			It("should return error", func() {
+				mockUpstream := NewMockUDPUpstreamServer().WithAnswerError(dns.RcodeServerFailure)
+
+				sutConfig.Upstream = mockUpstream.Start()
+				sut := newUpstreamResolverUnchecked(sutConfig, nil)
+
+				_, err := sut.Resolve(ctx, newRequest("example.com.", A))
+				Expect(err).Should(HaveOccurred())
+
+				var servErr *UpstreamServerError
+				Expect(errors.As(err, &servErr)).Should(BeTrue())
+			})
+		})
 		When("Timeout occurs", func() {
 			var counter int32
 			var attemptsWithTimeout int32
@@ -163,7 +178,7 @@ var _ = Describe("UpstreamResolver", Label("upstreamResolver"), func() {
 					sutConfig.Upstream = mockUpstream.Start()
 				})
 
-				It("should retry with UDP", func() {
+				It("should also try with UDP", func() {
 					req := newRequest("example.com.", A)
 					req.Protocol = RequestProtocolTCP
 

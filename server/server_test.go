@@ -104,10 +104,8 @@ var _ = BeforeSuite(func() {
 		CustomDNS: config.CustomDNS{
 			CustomTTL: config.Duration(3600 * time.Second),
 			Mapping: config.CustomDNSMapping{
-				HostIPs: map[string][]net.IP{
-					"custom.lan": {net.ParseIP("192.168.178.55")},
-					"lan.home":   {net.ParseIP("192.168.178.56")},
-				},
+				"custom.lan": {&dns.A{A: net.ParseIP("192.168.178.55")}},
+				"lan.home":   {&dns.A{A: net.ParseIP("192.168.178.56")}},
 			},
 		},
 		Conditional: config.ConditionalUpstream{
@@ -148,7 +146,7 @@ var _ = BeforeSuite(func() {
 			Upstream: upstreamClient,
 		},
 
-		Ports: config.PortsConfig{
+		Ports: config.Ports{
 			DNS:   config.ListenConfig{GetStringPort(dnsBasePort)},
 			TLS:   config.ListenConfig{GetStringPort(tlsBasePort)},
 			HTTP:  config.ListenConfig{GetStringPort(httpBasePort)},
@@ -156,7 +154,7 @@ var _ = BeforeSuite(func() {
 		},
 		CertFile: certPem.Path,
 		KeyFile:  keyPem.Path,
-		Prometheus: config.MetricsConfig{
+		Prometheus: config.Metrics{
 			Enable: true,
 			Path:   "/metrics",
 		},
@@ -596,14 +594,12 @@ var _ = Describe("Running DNS server", func() {
 					},
 					CustomDNS: config.CustomDNS{
 						Mapping: config.CustomDNSMapping{
-							HostIPs: map[string][]net.IP{
-								"custom.lan": {net.ParseIP("192.168.178.55")},
-								"lan.home":   {net.ParseIP("192.168.178.56")},
-							},
+							"custom.lan": {&dns.A{A: net.ParseIP("192.168.178.55")}},
+							"lan.home":   {&dns.A{A: net.ParseIP("192.168.178.56")}},
 						},
 					},
 					Blocking: config.Blocking{BlockType: "zeroIp"},
-					Ports: config.PortsConfig{
+					Ports: config.Ports{
 						DNS: config.ListenConfig{"127.0.0.1:" + GetStringPort(dnsBasePort2)},
 					},
 				})
@@ -642,14 +638,12 @@ var _ = Describe("Running DNS server", func() {
 					},
 					CustomDNS: config.CustomDNS{
 						Mapping: config.CustomDNSMapping{
-							HostIPs: map[string][]net.IP{
-								"custom.lan": {net.ParseIP("192.168.178.55")},
-								"lan.home":   {net.ParseIP("192.168.178.56")},
-							},
+							"custom.lan": {&dns.A{A: net.ParseIP("192.168.178.55")}},
+							"lan.home":   {&dns.A{A: net.ParseIP("192.168.178.56")}},
 						},
 					},
 					Blocking: config.Blocking{BlockType: "zeroIp"},
-					Ports: config.PortsConfig{
+					Ports: config.Ports{
 						DNS: config.ListenConfig{"127.0.0.1:" + GetStringPort(dnsBasePort2)},
 					},
 				})
@@ -712,7 +706,7 @@ var _ = Describe("Running DNS server", func() {
 		It("should create self-signed certificate if key/cert files are not provided", func() {
 			cfg.KeyFile = ""
 			cfg.CertFile = ""
-			cfg.Ports = config.PortsConfig{
+			cfg.Ports = config.Ports{
 				HTTPS: []string{fmt.Sprintf(":%d", GetIntPort(httpsBasePort)+100)},
 			}
 			sut, err := NewServer(ctx, &cfg)

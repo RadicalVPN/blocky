@@ -219,7 +219,7 @@ var _ = Describe("Config", func() {
 blocking:
   loading:
     refreshPeriod: wrongduration`
-				err := unmarshalConfig([]byte(data), &cfg)
+				err := unmarshalConfig(logger, []byte(data), &cfg)
 				Expect(err).Should(HaveOccurred())
 				Expect(err.Error()).Should(ContainSubstring("invalid duration \"wrongduration\""))
 			})
@@ -230,9 +230,20 @@ blocking:
 				data := `customDNS:
   mapping:
     someDomain: 192.168.178.WRONG`
-				err := unmarshalConfig([]byte(data), &cfg)
+				err := unmarshalConfig(logger, []byte(data), &cfg)
 				Expect(err).Should(HaveOccurred())
 				Expect(err.Error()).Should(ContainSubstring("invalid IP address '192.168.178.WRONG'"))
+			})
+		})
+		When("CustomDNS hast wrong IPv6 defined", func() {
+			It("should return error", func() {
+				cfg := Config{}
+				data := `customDNS:
+  mapping:
+    someDomain: 2001:MALFORMED:IP:ADDRESS:0000:8a2e:0370:7334`
+				err := unmarshalConfig(logger, []byte(data), &cfg)
+				Expect(err).Should(HaveOccurred())
+				Expect(err.Error()).Should(ContainSubstring("invalid IP address '2001:MALFORMED:IP:ADDRESS:0000:8a2e:0370:7334'"))
 			})
 		})
 		When("Conditional mapping hast wrong defined upstreams", func() {
@@ -241,7 +252,7 @@ blocking:
 				data := `conditional:
   mapping:
     multiple.resolvers: 192.168.178.1,wrongprotocol:4.4.4.4:53`
-				err := unmarshalConfig([]byte(data), &cfg)
+				err := unmarshalConfig(logger, []byte(data), &cfg)
 				Expect(err).Should(HaveOccurred())
 				Expect(err.Error()).Should(ContainSubstring("wrong host name 'wrongprotocol:4.4.4.4:53'"))
 			})
@@ -254,7 +265,7 @@ blocking:
     - 8.8.8.8
     - wrongprotocol:8.8.4.4
     - 1.1.1.1`
-				err := unmarshalConfig([]byte(data), &cfg)
+				err := unmarshalConfig(logger, []byte(data), &cfg)
 				Expect(err).Should(HaveOccurred())
 				Expect(err.Error()).Should(ContainSubstring("can't convert upstream 'wrongprotocol:8.8.4.4'"))
 			})
@@ -266,7 +277,7 @@ blocking:
   queryTypes:
     - invalidqtype
 `
-				err := unmarshalConfig([]byte(data), &cfg)
+				err := unmarshalConfig(logger, []byte(data), &cfg)
 				Expect(err).Should(HaveOccurred())
 				Expect(err.Error()).Should(ContainSubstring("unknown DNS query type: 'invalidqtype'"))
 			})
@@ -277,7 +288,7 @@ blocking:
 				cfg := Config{}
 				data := "bootstrapDns: 0.0.0.0"
 
-				err := unmarshalConfig([]byte(data), &cfg)
+				err := unmarshalConfig(logger, []byte(data), &cfg)
 				Expect(err).Should(Succeed())
 				Expect(cfg.BootstrapDNS[0].Upstream.Host).Should(Equal("0.0.0.0"))
 			})
@@ -289,7 +300,7 @@ bootstrapDns:
   ips:
     - 0.0.0.0
 `
-				err := unmarshalConfig([]byte(data), &cfg)
+				err := unmarshalConfig(logger, []byte(data), &cfg)
 				Expect(err).Should(Succeed())
 				Expect(cfg.BootstrapDNS[0].Upstream.Host).Should(Equal("dns.example.com"))
 				Expect(cfg.BootstrapDNS[0].IPs).Should(HaveLen(1))
@@ -303,7 +314,7 @@ bootstrapDns:
       - 0.0.0.0
   - upstream: 1.2.3.4
 `
-				err := unmarshalConfig([]byte(data), &cfg)
+				err := unmarshalConfig(logger, []byte(data), &cfg)
 				Expect(err).Should(Succeed())
 				Expect(cfg.BootstrapDNS).Should(HaveLen(2))
 				Expect(cfg.BootstrapDNS[0].Upstream.Host).Should(Equal("dns.example.com"))
@@ -318,7 +329,7 @@ bootstrapDns:
 			It("should return error", func() {
 				cfg := Config{}
 				data := `///`
-				err := unmarshalConfig([]byte(data), &cfg)
+				err := unmarshalConfig(logger, []byte(data), &cfg)
 				Expect(err).Should(HaveOccurred())
 				Expect(err.Error()).Should(ContainSubstring("cannot unmarshal !!str `///`"))
 			})
@@ -547,10 +558,10 @@ bootstrapDns:
 	)
 
 	Describe("SourceLoadingConfig", func() {
-		var cfg SourceLoadingConfig
+		var cfg SourceLoading
 
 		BeforeEach(func() {
-			cfg = SourceLoadingConfig{
+			cfg = SourceLoading{
 				Concurrency:   12,
 				RefreshPeriod: Duration(time.Hour),
 			}
@@ -744,22 +755,22 @@ bootstrapDns:
 
 	Describe("BootstrapDNSConfig", func() {
 		It("is not enabled when empty", func() {
-			var sut BootstrapDNSConfig
+			var sut BootstrapDNS
 
 			Expect(sut.IsEnabled()).Should(BeFalse())
 		})
 
 		It("is enabled if non empty", func() {
-			sut := BootstrapDNSConfig{
-				BootstrappedUpstreamConfig{},
-				BootstrappedUpstreamConfig{},
+			sut := BootstrapDNS{
+				BootstrappedUpstream{},
+				BootstrappedUpstream{},
 			}
 
 			Expect(sut.IsEnabled()).Should(BeTrue())
 		})
 
 		It("LogConfig panics", func() {
-			sut := BootstrapDNSConfig{}
+			sut := BootstrapDNS{}
 
 			Expect(func() {
 				sut.LogConfig(logger)
@@ -777,7 +788,7 @@ bootstrapDns:
 			DeferCleanup(cancelFn)
 		})
 		It("handles panics", func() {
-			sut := SourceLoadingConfig{
+			sut := SourceLoading{
 				Init: Init{Strategy: InitStrategyFailOnError},
 			}
 
@@ -793,7 +804,7 @@ bootstrapDns:
 		})
 
 		It("periodically calls refresh", func() {
-			sut := SourceLoadingConfig{
+			sut := SourceLoading{
 				Init:          Init{Strategy: InitStrategyFast},
 				RefreshPeriod: Duration(5 * time.Millisecond),
 			}
@@ -846,6 +857,16 @@ bootstrapDns:
 			Expect(err).Should(HaveOccurred())
 		})
 	})
+
+	Describe("Documentation config", func() {
+		It("should not use deprecated options", func() {
+			logger, hook := log.NewMockEntry()
+
+			_, err := loadConfig(logger, "../docs/config.yml", true)
+			Expect(err).Should(Succeed())
+			Expect(hook.Messages).ShouldNot(ContainElement(ContainSubstring("deprecated")))
+		})
+	})
 })
 
 func defaultTestFileConfig(config *Config) {
@@ -856,12 +877,24 @@ func defaultTestFileConfig(config *Config) {
 	Expect(config.Upstreams.Groups["default"][0].Host).Should(Equal("8.8.8.8"))
 	Expect(config.Upstreams.Groups["default"][1].Host).Should(Equal("8.8.4.4"))
 	Expect(config.Upstreams.Groups["default"][2].Host).Should(Equal("1.1.1.1"))
-	Expect(config.CustomDNS.Mapping.HostIPs).Should(HaveLen(2))
-	Expect(config.CustomDNS.Mapping.HostIPs["my.duckdns.org"][0]).Should(Equal(net.ParseIP("192.168.178.3")))
-	Expect(config.CustomDNS.Mapping.HostIPs["multiple.ips"][0]).Should(Equal(net.ParseIP("192.168.178.3")))
-	Expect(config.CustomDNS.Mapping.HostIPs["multiple.ips"][1]).Should(Equal(net.ParseIP("192.168.178.4")))
-	Expect(config.CustomDNS.Mapping.HostIPs["multiple.ips"][2]).Should(Equal(
-		net.ParseIP("2001:0db8:85a3:08d3:1319:8a2e:0370:7344")))
+	Expect(config.CustomDNS.Mapping).Should(HaveLen(2))
+
+	duckDNSEntry := config.CustomDNS.Mapping["my.duckdns.org"][0]
+	duckDNSA := duckDNSEntry.(*dns.A)
+	Expect(duckDNSA.A).Should(Equal(net.ParseIP("192.168.178.3")))
+
+	multipleIpsEntry := config.CustomDNS.Mapping["multiple.ips"][0]
+	multipleIpsA := multipleIpsEntry.(*dns.A)
+	Expect(multipleIpsA.A).Should(Equal(net.ParseIP("192.168.178.3")))
+
+	multipleIpsEntry = config.CustomDNS.Mapping["multiple.ips"][1]
+	multipleIpsA = multipleIpsEntry.(*dns.A)
+	Expect(multipleIpsA.A).Should(Equal(net.ParseIP("192.168.178.4")))
+
+	multipleIpsEntry = config.CustomDNS.Mapping["multiple.ips"][2]
+	multipleIpsAAAA := multipleIpsEntry.(*dns.AAAA)
+	Expect(multipleIpsAAAA.AAAA).Should(Equal(net.ParseIP("2001:db8:85a3:8d3:1319:8a2e:370:7344")))
+
 	Expect(config.Conditional.Mapping.Upstreams).Should(HaveLen(2))
 	Expect(config.Conditional.Mapping.Upstreams["fritz.box"]).Should(HaveLen(1))
 	Expect(config.Conditional.Mapping.Upstreams["multiple.resolvers"]).Should(HaveLen(2))

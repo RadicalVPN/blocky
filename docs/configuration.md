@@ -81,11 +81,11 @@ This applies to all of them. The default strategy is blocking.
 
 | Parameter               | Type                                 | Mandatory | Default value | Description                                    |
 | ----------------------- | ------------------------------------ | --------- | ------------- | ---------------------------------------------- |
-| usptreams.groups        | map of name to upstream              | yes       |               | Upstream DNS servers to use, in groups.        |
-| usptreams.init.strategy | enum (blocking, failOnError, fast)   | no        | blocking      | See [Init Strategy](#init-strategy) and below. |
-| usptreams.strategy      | enum (parallel_best, random, strict) | no        | parallel_best | Upstream server usage strategy.                |
-| usptreams.timeout       | duration                             | no        | 2s            | Upstream connection timeout.                   |
-| usptreams.userAgent     | string                               | no        |               | HTTP User Agent when connecting to upstreams.  |
+| upstreams.groups        | map of name to upstream              | yes       |               | Upstream DNS servers to use, in groups.        |
+| upstreams.init.strategy | enum (blocking, failOnError, fast)   | no        | blocking      | See [Init Strategy](#init-strategy) and below. |
+| upstreams.strategy      | enum (parallel_best, random, strict) | no        | parallel_best | Upstream server usage strategy.                |
+| upstreams.timeout       | duration                             | no        | 2s            | Upstream connection timeout.                   |
+| upstreams.userAgent     | string                               | no        |               | HTTP User Agent when connecting to upstreams.  |
 
 For `init.strategy`, the "init" is testing the given resolvers for each group. The potentially fatal error, depending on the strategy, is if a group has no functional resolvers.
 
@@ -259,12 +259,12 @@ You can define your own domain name to IP mappings. For example, you can use a u
 or define a domain name for your local device on order to use the HTTPS certificate. Multiple IP addresses for one
 domain must be separated by a comma.
 
-| Parameter           | Type                                    | Mandatory | Default value |
-| ------------------- | --------------------------------------- | --------- | ------------- |
-| customTTL           | duration (no unit is minutes)           | no        | 1h            |
-| rewrite             | string: string (domain: domain)         | no        |               |
-| mapping             | string: string (hostname: address list) | no        |               |
-| filterUnmappedTypes | boolean                                 | no        | true          |
+| Parameter           | Type                                        | Mandatory | Default value |
+| ------------------- | ------------------------------------------- | --------- | ------------- |
+| customTTL           | duration (no unit is minutes)               | no        | 1h            |
+| rewrite             | string: string (domain: domain)             | no        |               |
+| mapping             | string: string (hostname: address or CNAME) | no        |               |
+| filterUnmappedTypes | boolean                                     | no        | true          |
 
 !!! example
 
@@ -278,10 +278,13 @@ domain must be separated by a comma.
       mapping:
         printer.lan: 192.168.178.3
         otherdevice.lan: 192.168.178.15,2001:0db8:85a3:08d3:1319:8a2e:0370:7344
+        anothername.lan: CNAME(otherdevice.lan)
     ```
 
 This configuration will also resolve any subdomain of the defined domain, recursively. For example querying any of
 `printer.lan`, `my.printer.lan` or `i.love.my.printer.lan` will return 192.168.178.3.
+
+CNAME records are supported by setting the value of the mapping to `CNAME(target)`. Note that the target will be recursively resolved and will return an error if a loop is detected.
 
 With the optional parameter `rewrite` you can replace domain part of the query with the defined part **before** the
 resolver lookup is performed.
@@ -829,8 +832,8 @@ These settings apply only to the resolver under which they are nested.
 
 #### Refresh / Reload
 
-To keep source contents up-to-date, blocky can periodically refresh and reparse them. Default period is **
-4 hours**. You can configure this by setting the `refreshPeriod` parameter to a value in **duration format**.  
+To keep source contents up-to-date, blocky can periodically refresh and reparse them. Default period is
+**4 hours**. You can configure this by setting the `refreshPeriod` parameter to a value in **duration format**.  
 A value of zero or less will disable this feature.
 
 !!! example
