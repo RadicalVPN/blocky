@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/0xERR0R/blocky/config"
 	"github.com/0xERR0R/blocky/evt"
@@ -25,14 +26,16 @@ func newMultiServeCommand() *cobra.Command {
 
 func startMultiServer(_ *cobra.Command, args []string) error {
 	printBanner()
-	var terminationErr error
 
-	fmt.Println(fmt.Sprintf("Starting %d servers...", len(args)))
+	start := time.Now()
+
+	fmt.Printf("Starting %d servers...\n", len(args))
 
 	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
 
 	for _, configPath := range args {
 		fmt.Println("loading config", configPath)
+
 		cfg, err := config.LoadConfig(configPath, isConfigMandatory)
 		if err != nil {
 			return err
@@ -49,7 +52,7 @@ func startMultiServer(_ *cobra.Command, args []string) error {
 		}
 
 		const errChanSize = 10
-		errChan := make(chan error)
+		errChan := make(chan error, errChanSize)
 
 		fmt.Println("starting server", configPath)
 
@@ -58,11 +61,10 @@ func startMultiServer(_ *cobra.Command, args []string) error {
 		fmt.Println("server started")
 	}
 
-	fmt.Println("all servers started")
+	// all servers started in x seconds
+	fmt.Printf("All servers started in %s seconds\n", time.Since(start))
 
 	evt.Bus().Publish(evt.ApplicationStarted, util.Version, util.BuildTime)
 
 	select {}
-
-	return terminationErr
 }
